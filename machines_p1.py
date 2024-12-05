@@ -9,12 +9,13 @@ class P1:
         self.available_pieces = available_pieces
 
     def select_piece(self):
-        if len(self.available_pieces) >= 13:
-            return random.choice(self.available_pieces)
 
         remaining_pieces = len(self.available_pieces)
-        if remaining_pieces >= 9:
-            depth = 14
+
+        if len(self.available_pieces) >= 13:
+            return random.choice(self.available_pieces)
+        elif remaining_pieces >= 9:
+            depth = 8
         else:
             depth = 16
 
@@ -93,9 +94,9 @@ class P1:
 
     def evaluate(self, board):
         if self.check_win(board):
-            return 1
+            return 3
         elif self.is_board_full(board):
-            return 0
+            return 2
         return -1
 
     def get_available_moves(self, board):
@@ -125,7 +126,7 @@ class P1:
         if remaining_moves >= 14:
             return random.choice(available_moves)
         elif remaining_moves == 12:
-            depth = 12
+            depth = 6
         else:
             depth = 16
 
@@ -226,5 +227,3 @@ class P1:
                     return (row, col)
 
         return None
-
-
