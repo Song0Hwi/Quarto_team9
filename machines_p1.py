@@ -10,6 +10,14 @@ class P1:
 
     def select_piece(self):
 
+
+        filtered_pieces = self.filter_available_pieces()
+
+        if not filtered_pieces:
+            filtered_pieces = self.available_pieces
+
+        print(filtered_pieces)
+
         remaining_pieces = len(self.available_pieces)
 
         if len(self.available_pieces) >= 13:
@@ -162,13 +170,66 @@ class P1:
     def is_board_full(self, board):
         return np.all(board != 0)
 
+    def filter_available_pieces(self):
+        """
+        현재 보드 상태를 분석하여 동일한 속성이 3개 존재하는 가로, 세로, 대각선, 2x2 사각형의 속성을 제외한 available_pieces를 반환합니다.
+        """
+        excluded_values = {0: set(), 1: set(), 2: set(), 3: set()}  # 제외해야 할 속성 인덱스
+        rows, cols = self.board.shape
+
+        def check_and_add_excluded(line):
+            """줄에서 동일한 속성을 가진 3개의 말을 확인하고 속성을 제외 목록에 추가"""
+            filled_positions = [idx for idx in line if idx != 0]
+            if len(filled_positions) == 3:  # 3개의 말이 있을 경우
+                characteristics = np.array([self.pieces[idx - 1] for idx in filled_positions])
+                for i in range(4):  # 각 속성 (0: I/E, 1: N/S, 2: T/F, 3: P/J)
+                    if len(set(characteristics[:, i])) == 1:  # 같은 속성을 가진 경우
+                        excluded_values[i].add(characteristics[0][i])  # 해당 속성의 값을 제외 목록에 추가
+
+        # 가로줄 확인
+        for row in range(rows):
+            check_and_add_excluded(self.board[row, :])
+
+        # 세로줄 확인
+        for col in range(cols):
+            check_and_add_excluded(self.board[:, col])
+
+        # 대각선 확인
+        check_and_add_excluded([self.board[i, i] for i in range(rows)])  # 왼쪽 위 -> 오른쪽 아래
+        check_and_add_excluded([self.board[i, rows - i - 1] for i in range(rows)])  # 오른쪽 위 -> 왼쪽 아래
+
+        # 2x2 사각형 확인
+        for r in range(rows - 1):
+            for c in range(cols - 1):
+                subgrid = [self.board[r, c], self.board[r, c + 1], self.board[r + 1, c], self.board[r + 1, c + 1]]
+                filled_positions = [idx for idx in subgrid if idx != 0]
+                if len(filled_positions) == 3:  # 3개의 말이 있을 경우
+                    characteristics = np.array([self.pieces[idx - 1] for idx in filled_positions])
+                    for i in range(4):
+                        if len(set(characteristics[:, i])) == 1:  # 같은 속성을 가진 경우
+                            excluded_values[i].add(characteristics[0][i])
+
+        # excluded_values에 정의된 속성을 제외한 available_pieces를 반환합니다.
+        filtered_pieces = []
+
+        for piece in self.available_pieces:
+            is_valid = True  # 현재 piece가 유효한지 여부
+            for i, value in enumerate(piece):  # piece의 각 속성을 체크
+                if value in excluded_values[i]:  # 속성 i의 값이 제외해야 할 값에 포함되는지 확인
+                    is_valid = False
+                    break  # 제외할 값이 있으면 이 piece는 더 이상 유효하지 않음
+            if is_valid:
+                filtered_pieces.append(piece)  # 유효한 piece는 결과에 추가
+
+        return filtered_pieces
+
     def check_win_in_line(self, row, col, selected_piece):
         # 가로, 세로, 대각선에서 승리할 수 있는지 체크
         possible_lines = [
             [(row, i) for i in range(4)],  # 가로
             [(i, col) for i in range(4)],  # 세로
             [(i, i) for i in range(4)],  # 대각선
-            [(i, 3-i) for i in range(4)],  # 반대 대각선
+            [(i, 3 - i) for i in range(4)],  # 반대 대각선
         ]
         selected_attribute1, selected_attribute2, selected_attribute3, selected_attribute4 = selected_piece
 
@@ -185,9 +246,9 @@ class P1:
 
                     # selected_piece와 속성 값 중 하나라도 일치하는지 확인
                     if (piece_attribute1 == selected_attribute1 or
-                        piece_attribute2 == selected_attribute2 or
-                        piece_attribute3 == selected_attribute3 or
-                        piece_attribute4 == selected_attribute4):
+                            piece_attribute2 == selected_attribute2 or
+                            piece_attribute3 == selected_attribute3 or
+                            piece_attribute4 == selected_attribute4):
                         matching_count += 1
 
             # 3개의 선택된 말과 1개의 빈 칸이 있으면 승리할 수 있음
@@ -200,7 +261,7 @@ class P1:
         # 2x2 정사각형에서 승리할 수 있는지 체크
         if row < 3 and col < 3:  # 2x2 정사각형이 존재할 수 있는 범위
             square_positions = [
-                [(row, col), (row, col+1), (row+1, col), (row+1, col+1)]
+                [(row, col), (row, col + 1), (row + 1, col), (row + 1, col + 1)]
             ]
             selected_attribute1, selected_attribute2, selected_attribute3, selected_attribute4 = selected_piece
 
@@ -217,9 +278,9 @@ class P1:
 
                         # selected_piece와 속성 값 중 하나라도 일치하는지 확인
                         if (piece_attribute1 == selected_attribute1 or
-                            piece_attribute2 == selected_attribute2 or
-                            piece_attribute3 == selected_attribute3 or
-                            piece_attribute4 == selected_attribute4):
+                                piece_attribute2 == selected_attribute2 or
+                                piece_attribute3 == selected_attribute3 or
+                                piece_attribute4 == selected_attribute4):
                             matching_count += 1
 
                 # 3개의 선택된 말과 1개의 빈 칸이 있으면 승리할 수 있음
@@ -227,3 +288,6 @@ class P1:
                     return (row, col)
 
         return None
+
+    def get_available_moves(self, board):
+        return list(zip(*np.where(board == 0)))
