@@ -13,6 +13,7 @@ class P2():
         self.pieces = [(i, j, k, l) for i in range(2) for j in range(2) for k in range(2) for l in range(2)]  # All 16 pieces
         self.board = board # Include piece indices. 0:empty / 1~16:piece
         self.available_pieces = available_pieces # Currently available pieces in a tuple type (e.g. (1, 0, 1, 0))
+        self.available_locs = [[r, c] for r in range(BOARD_ROWS) for c in range(BOARD_COLS) if board[r][c] == 0]
     
     def select_piece(self):
         if(len(self.available_pieces) >= 14):
@@ -25,110 +26,89 @@ class P2():
             new_pieces = copy.deepcopy(self.available_pieces)
             new_pieces.remove(piece)
 
-            for row in range(BOARD_ROWS):
-                for col in range(BOARD_COLS):
-                    if new_board[row][col] == 0:
-                        new_board[row][col] = self.pieces.index(piece) + 1
-                        for depth in range(1, 5):
-                            start_time = time.time()
-                            score = self.minimax(new_board, new_pieces, depth, False, -1e9, 1e9)
-                            end_time = time.time()
+            start_time = time.time()
+            score = self.minimax(new_board, new_pieces, 4, False, -1e9, 1e9)
+            end_time = time.time()
 
-                            if end_time - start_time > 30:
-                                break
+            if end_time - start_time > 60:
+                break
 
-                        if score > best_score:
-                            if score == 1e9:
-                                return piece
-                            best_score = score
-                            best_piece = piece
-
-                        new_board[row][col] = 0
+            if score > best_score:
+                best_score = score
+                best_piece = piece
                                 
         return best_piece
 
     def place_piece(self, selected_piece):
-        available_locs = [(row, col) for row, col in product(range(4), range(4)) if self.board[row][col]==0]
         if len(self.available_pieces) >= 13:
-            return random.choice(available_locs)
+            return random.choice(self.available_locs)
         else:
-            best_value = float('-inf')
+            best_score = float('-inf')
             best_move = None
 
-        for row in range (BOARD_ROWS):
-            for col in range (BOARD_COLS):
-                new_board = copy.deepcopy(self.board)
-                if new_board[row][col] == 0:
-                    
-                    new_board[row][col] = self.pieces.index(selected_piece) + 1
-                    for depth in range(1, 5):
-                        start_time = time.time()
-                        value = self.minimax(new_board, self.available_pieces, depth, True, -1e9, 1e9)
-                        end_time = time.time()
+        new_board = copy.deepcopy(self.board)
+        for loc in self.available_locs:
+            new_board[loc] = self.pieces.index(selected_piece) + 1
+            
+            start_time = time.time()
+            score = self.minimax(new_board, self.available_pieces, 4, True, -1e9, 1e9)
+            end_time = time.time()
 
-                        if end_time - start_time > 30:
-                            break
-                    
-                    if value > best_value:
-                        best_value = value
-                        best_move = (row, col)
+            if end_time - start_time > 30:
+                break
+
+            if score > best_score:
+                best_score = score
+                best_move = loc
         return best_move[0], best_move[1]
+        
 
     def minimax(self, board, available_pieces, depth, maximizing_player, alpha, beta):
-        if self.check_win():
-            return 1e9
-        elif depth == 0 or self.is_board_full():
-            return 0
+        if depth == 1 or self.is_board_full():
+            return self.evaluate()
 
         if maximizing_player:
-            max_eval = -1e9
-            for row in range (BOARD_ROWS):
-                for col in range (BOARD_COLS):
-                    for piece in available_pieces:
-                        if board[row][col] == 0:
-                            board[row][col] = self.pieces.index(piece) + 1
-                            available_pieces.remove(piece)
-                            eval = self.minimax(board, available_pieces, depth - 1, False, alpha, beta)
-                            board[row][col] = 0
-                            available_pieces.append(piece)
-                            max_eval = max(max_eval, eval)
-                            alpha = max(alpha, eval)
-                            if beta <= alpha:
-                                break
-            return max_eval
+            best_score = -1e9
+            for (r,c) in self.available_locs:
+                for piece in available_pieces:
+                    board[r][c] = self.pieces.index(piece) + 1
+                    available_pieces.remove(piece)
+                    score = self.minimax(board, available_pieces, depth - 1, False, alpha, beta)
+                    board[r][c] = 0
+                    available_pieces.append(piece)
+                    best_score = max(best_score, score)
+                    alpha = max(alpha, score)
+                    if beta <= alpha:
+                        break
+            return best_score
         else:
-            min_eval = 1e9
-            for row in range (BOARD_ROWS):
-                for col in range (BOARD_COLS):
+            best_score = 1e9
+            for (r,c) in self.available_locs:
                     for piece in available_pieces:
-                        if board[row][col] == 0:
-                            board[row][col] = self.pieces.index(piece) + 1
-                            available_pieces.remove(piece)
-                            eval = self.minimax(board, available_pieces, depth - 1, True, alpha, beta)
-                            board[row][col] = 0
-                            available_pieces.append(piece)
-                            min_eval = min(min_eval, eval)
-                            beta = min(beta, eval)
-                            if beta <= alpha:
-                                break
-            return min_eval
+                        board[r][c] = self.pieces.index(piece) + 1
+                        available_pieces.remove(piece)
+                        score = self.minimax(board, available_pieces, depth - 1, True, alpha, beta)
+                        board[r][c] = 0
+                        available_pieces.append(piece)
+                        best_score = min(best_score, score)
+                        beta = min(beta, score)
+                        if beta <= alpha:
+                            break
+            return best_score
 
     def evaluate(self):
         if(self.check_win()):
             return 1e9
-        elif(not self.check_win() | self.is_board_full()):
-             return -1e9
-        else:
+        elif(self.is_board_full()):
+            return 0
+        elif self.check_three():
             # 각 line, 사각형에서 세 개가 모였을 때, 겹치는 속성이 있는지
             # 즉, 상대방이 다음 차례에 이길 수 있는 상황인지
-            # -> -1e9
-            if self.check_three():
-                return -1e9
+            return -1e9
             
-            # 가장자리보다 가운데에 말을 둘 때 더 높은 점수를 준다?
-
-            # 
-            return 100
+            # 가장자리보다 가운데에 말을 둘 때 더 높은 점수 부여
+        else:
+            return 0
     
     def is_board_full(self):
         for row in range(BOARD_ROWS):
@@ -149,13 +129,14 @@ class P2():
     # 한 줄에 세 개 이상 같은 속성이 있는지 체크
     # [self.board[row][col] for row in range(BOARD_ROWS)]
     def check_line_three(self, line):
-        if line.count(1) < 3:
-            return False
-        num_pieces = len(line)
-        characteristics = np.array([self.pieces[piece_idx - 1] for piece_idx in line])
+        temp_line = line.copy()
         for i in range(4):
-            if num_pieces >= 3:
-                if len(set(characteristics[:, i])) <= 1:
+            if temp_line[i] != 1:
+                line.remove(temp_line[i])
+        if len(line) == 3:
+            characteristics = np.array([self.pieces[piece_idx - 1] for piece_idx in line])
+            for i in range(4):
+                if len(set(characteristics[:, i])) == 1:
                     return True
         return False
 
@@ -171,19 +152,24 @@ class P2():
         return False
     
     def check_2x2_subgrid_three(self):
-        for r in range(BOARD_ROWS - 1):
-            for c in range(BOARD_COLS - 1):
+        temp_board = [[r, c] for r in range(BOARD_ROWS) for c in range(BOARD_COLS) if self.board[r][c] == 1]
+        
+        for loc in temp_board:
+            r = loc[0]
+            c = loc[1]
+            if r < BOARD_ROWS - 1 and c < BOARD_COLS - 1:
                 subgrid = [self.board[r][c], self.board[r][c+1], self.board[r+1][c], self.board[r+1][c+1]]
-                count = sum(1 for x in subgrid if x == 1)
-                if count >= 3:
+                temp_subgrid = subgrid.copy()
+                for i in range(4):
+                    if not temp_subgrid[i]:
+                        subgrid.remove(temp_subgrid[i])
+                if len(subgrid) == 3:
+                    characteristics = [self.pieces[idx - 1] for idx in subgrid]
                     for i in range(4):
-                        if subgrid[i] == 1:
-                            characteristics = [self.pieces[subgrid[i] - 1]]
-                            for j in range(4):
-                                if len(set(char[t] for char in characteristics)) == 1:
-                                    return True
+                        if len(set(char[i] for char in characteristics)) == 1:
+                            return True
         return False
-
+    
     def check_win(self):
         # Check rows, columns, and diagonals
         for col in range(BOARD_COLS):
