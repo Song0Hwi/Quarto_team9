@@ -17,7 +17,7 @@ class P1:
         self.available_pieces = available_pieces
         self.center_positions = [(2, 2), (2, 3), (3, 2), (3, 3)]
 
-    # 상대방의 가장 최적의 조각을 평가
+    # 상대방의 최적 조각 평가
     def evaluate_piece_for_opponent(self, piece):
         score = 0
         for row, col in self.get_available_locations():
@@ -82,7 +82,7 @@ class P1:
             # 알파베타 가지치기 로직
             alpha = max(alpha, score)
             if beta <= alpha:
-                break  # 더 이상 탐색할 필요가 없음
+                break  # 더 이상 탐색할 필요 없음
 
         # 동점일 경우 랜덤 선택
         return random.choice(best_positions)
@@ -91,7 +91,7 @@ class P1:
     def is_first_move(self):
         return np.count_nonzero(self.board) == 0
 
-    # 사용 가능한 위치를 반환하는 함수
+    # 사용 가능한 위치를 반환
     def get_available_locations(self):
         return [(row, col) for row, col in product(range(BOARD_ROWS), range(BOARD_COLS)) if self.board[row][col] == 0]
 
@@ -101,7 +101,7 @@ class P1:
         simulated_board[row][col] = self.pieces.index(piece) + 1
         return simulated_board
 
-    # 승리 여부를 체크하는 함수
+    # 승리 여부를 체크
     def check_win(self, board):
         def check_line(line):
             if 0 in line:
@@ -112,7 +112,19 @@ class P1:
                     return True
             return False
 
-        # 행, 열, 대각선 체크
+        def check_2x2_win():
+            for row in range(BOARD_ROWS - 1):
+                for col in range(BOARD_COLS - 1):
+                    subgrid = [board[row][col], board[row][col + 1],
+                               board[row + 1][col], board[row + 1][col + 1]]
+                    if 0 not in subgrid:
+                        characteristics = np.array([self.pieces[piece_idx - 1] for piece_idx in subgrid])
+                        for i in range(4):
+                            if len(set(characteristics[:, i])) == 1:
+                                return True
+            return False
+
+        # 행, 열, 대각선, 2x2 체크
         for col in range(BOARD_COLS):
             if check_line([board[row][col] for row in range(BOARD_ROWS)]):
                 return True
@@ -121,20 +133,25 @@ class P1:
                 return True
         if check_line([board[i][i] for i in range(BOARD_ROWS)]) or check_line([board[i][BOARD_ROWS - i - 1] for i in range(BOARD_ROWS)]):
             return True
-        return False
+        return check_2x2_win()
 
-    # 위협을 평가하는 함수
+    # 위협을 평가
     def evaluate_threat(self, board):
         def check_line_threat(line):
             filled_positions = [piece for piece in line if piece != 0]
-            if len(filled_positions) == 3:
+            if len(filled_positions) == 2:  # 2개의 조각이 있는 경우 위협 평가
+                characteristics = np.array([self.pieces[piece_idx - 1] for piece_idx in filled_positions])
+                for i in range(4):
+                    if len(set(characteristics[:, i])) == 1:  # 공통 특성이 있으면 위협으로 간주
+                        return THREAT_PENALTY
+            elif len(filled_positions) == 3:  # 3개의 조각이 있는 경우
                 characteristics = np.array([self.pieces[piece_idx - 1] for piece_idx in filled_positions])
                 for i in range(4):
                     if len(set(characteristics[:, i])) == 1:
                         return THREAT_PENALTY
             return 0
 
-        # 행, 열, 대각선 위협 체크
+        # 행, 열, 대각선, 2x2 위협 체크
         for col in range(BOARD_COLS):
             if check_line_threat([board[row][col] for row in range(BOARD_ROWS)]):
                 return THREAT_PENALTY
@@ -143,4 +160,16 @@ class P1:
                 return THREAT_PENALTY
         if check_line_threat([board[i][i] for i in range(BOARD_ROWS)]) or check_line_threat([board[i][BOARD_ROWS - i - 1] for i in range(BOARD_ROWS)]):
             return THREAT_PENALTY
+
+        # 2x2 위협 체크
+        for row in range(BOARD_ROWS - 1):
+            for col in range(BOARD_COLS - 1):
+                subgrid = [board[row][col], board[row][col + 1],
+                           board[row + 1][col], board[row + 1][col + 1]]
+                if 0 in subgrid:
+                    continue
+                characteristics = np.array([self.pieces[piece_idx - 1] for piece_idx in subgrid])
+                for i in range(4):
+                    if len(set(characteristics[:, i])) == 1:
+                        return THREAT_PENALTY
         return 0
